@@ -180,8 +180,8 @@ static int urlpart(char *url, writeoutid vid, const char **contentp)
   CURLU *uh = curl_url();
   int rc = 0;
   if(url) {
-    CURLUPart cpart;
-    char *part;
+    CURLUPart cpart = CURLUPART_HOST;
+    char *part = NULL;
 
     switch(vid) {
     case VAR_INPUT_URLHOST:
