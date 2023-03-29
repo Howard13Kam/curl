@@ -123,6 +123,16 @@ static const struct writeoutvar variables[] = {
    writeTime},
   {"time_total", VAR_TOTAL_TIME, CURLINFO_TOTAL_TIME_T, writeTime},
   {"url", VAR_INPUT_URL, CURLINFO_NONE, writeString},
+  {"url-scheme", VAR_INPUT_URLSCHEME, CURLINFO_NONE, writeString},
+  {"url-user", VAR_INPUT_URLUSER, CURLINFO_NONE, writeString},
+  {"url-password", VAR_INPUT_URLPASSWORD, CURLINFO_NONE, writeString},
+  {"url-options", VAR_INPUT_URLOPTIONS, CURLINFO_NONE, writeString},
+  {"url-host", VAR_INPUT_URLHOST, CURLINFO_NONE, writeString},
+  {"url-port", VAR_INPUT_URLPORT, CURLINFO_NONE, writeString},
+  {"url-path", VAR_INPUT_URLPATH, CURLINFO_NONE, writeString},
+  {"url-query", VAR_INPUT_URLQUERY, CURLINFO_NONE, writeString},
+  {"url-fragment", VAR_INPUT_URLFRAGMENT, CURLINFO_NONE, writeString},
+  {"url-zoneid", VAR_INPUT_URLZONEID, CURLINFO_NONE, writeString},
   {"url_effective", VAR_EFFECTIVE_URL, CURLINFO_EFFECTIVE_URL, writeString},
   {"urlnum", VAR_URLNUM, CURLINFO_NONE, writeLong},
   {NULL, VAR_NONE, CURLINFO_NONE, NULL}
@@ -165,12 +175,73 @@ static int writeTime(FILE *stream, const struct writeoutvar *wovar,
   return 1; /* return 1 if anything was written */
 }
 
+static int urlpart(char *url, writeoutid vid, const char **contentp)
+{
+  CURLU *uh = curl_url();
+  int rc = 0;
+  if(url) {
+    CURLUPart cpart;
+    char *part;
+
+    switch(vid) {
+    case VAR_INPUT_URLHOST:
+      cpart = CURLUPART_HOST;
+      break;
+    case VAR_INPUT_URLPATH:
+      cpart = CURLUPART_PATH;
+      break;
+    case VAR_INPUT_URLSCHEME:
+      cpart = CURLUPART_SCHEME;
+      break;
+    case VAR_INPUT_URLUSER:
+      cpart = CURLUPART_USER;
+      break;
+    case VAR_INPUT_URLPASSWORD:
+      cpart = CURLUPART_PASSWORD;
+      break;
+    case VAR_INPUT_URLOPTIONS:
+      cpart = CURLUPART_OPTIONS;
+      break;
+    case VAR_INPUT_URLPORT:
+      cpart = CURLUPART_PORT;
+      break;
+    case VAR_INPUT_URLQUERY:
+      cpart = CURLUPART_QUERY;
+      break;
+    case VAR_INPUT_URLFRAGMENT:
+      cpart = CURLUPART_FRAGMENT;
+      break;
+    case VAR_INPUT_URLZONEID:
+      cpart = CURLUPART_ZONEID;
+      break;
+    default:
+      /* not implemented */
+      rc = 4;
+      break;
+    }
+    if(!rc && curl_url_set(uh, CURLUPART_URL, url,
+                           CURLU_GUESS_SCHEME|CURLU_NON_SUPPORT_SCHEME))
+      rc = 2;
+
+    if(!rc && curl_url_get(uh, cpart, &part, CURLU_DEFAULT_PORT))
+      rc = 3;
+
+    if(!rc && part)
+      *contentp = part;
+    curl_url_cleanup(uh);
+  }
+  else
+    return 1;
+  return rc;
+}
+
 static int writeString(FILE *stream, const struct writeoutvar *wovar,
                        struct per_transfer *per, CURLcode per_result,
                        bool use_json)
 {
   bool valid = false;
   const char *strinfo = NULL;
+  const char *freestr = NULL;
   struct dynbuf buf;
   curlx_dyn_init(&buf, 256*1024);
 
@@ -262,6 +333,23 @@ static int writeString(FILE *stream, const struct writeoutvar *wovar,
         valid = true;
       }
       break;
+    case VAR_INPUT_URLHOST:
+    case VAR_INPUT_URLPATH:
+    case VAR_INPUT_URLSCHEME:
+    case VAR_INPUT_URLUSER:
+    case VAR_INPUT_URLPASSWORD:
+    case VAR_INPUT_URLOPTIONS:
+    case VAR_INPUT_URLPORT:
+    case VAR_INPUT_URLQUERY:
+    case VAR_INPUT_URLFRAGMENT:
+    case VAR_INPUT_URLZONEID:
+      if(per->this_url) {
+        if(!urlpart(per->this_url, wovar->id, &strinfo)) {
+          freestr = strinfo;
+          valid = true;
+        }
+      }
+      break;
     default:
       DEBUGASSERT(0);
       break;
@@ -281,6 +369,7 @@ static int writeString(FILE *stream, const struct writeoutvar *wovar,
     if(use_json)
       fprintf(stream, "\"%s\":null", wovar->name);
   }
+  curl_free((char *)freestr);
 
   curlx_dyn_free(&buf);
   return 1; /* return 1 if anything was written */
