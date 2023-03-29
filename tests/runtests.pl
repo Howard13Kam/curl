@@ -152,7 +152,7 @@ my $VCURL=$CURL;   # what curl binary to use to verify the servers with
 my $ACURL=$VCURL;  # what curl binary to use to talk to APIs (relevant for CI)
                    # ACURL is handy to set to the system one for reliability
 my $DBGCURL=$CURL; #"../src/.libs/curl";  # alternative for debugging
-my $LOGDIR="log";
+my $LOGDIR="log$$";
 my $TESTDIR="$srcdir/data";
 my $LIBDIR="./libtest";
 my $UNITDIR="./unit";
