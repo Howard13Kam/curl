@@ -133,6 +133,16 @@ static const struct writeoutvar variables[] = {
   {"url-query", VAR_INPUT_URLQUERY, CURLINFO_NONE, writeString},
   {"url-fragment", VAR_INPUT_URLFRAGMENT, CURLINFO_NONE, writeString},
   {"url-zoneid", VAR_INPUT_URLZONEID, CURLINFO_NONE, writeString},
+  {"urle-scheme", VAR_INPUT_URLESCHEME, CURLINFO_NONE, writeString},
+  {"urle-user", VAR_INPUT_URLEUSER, CURLINFO_NONE, writeString},
+  {"urle-password", VAR_INPUT_URLEPASSWORD, CURLINFO_NONE, writeString},
+  {"urle-options", VAR_INPUT_URLEOPTIONS, CURLINFO_NONE, writeString},
+  {"urle-host", VAR_INPUT_URLEHOST, CURLINFO_NONE, writeString},
+  {"urle-port", VAR_INPUT_URLEPORT, CURLINFO_NONE, writeString},
+  {"urle-path", VAR_INPUT_URLEPATH, CURLINFO_NONE, writeString},
+  {"urle-query", VAR_INPUT_URLEQUERY, CURLINFO_NONE, writeString},
+  {"urle-fragment", VAR_INPUT_URLEFRAGMENT, CURLINFO_NONE, writeString},
+  {"urle-zoneid", VAR_INPUT_URLEZONEID, CURLINFO_NONE, writeString},
   {"url_effective", VAR_EFFECTIVE_URL, CURLINFO_EFFECTIVE_URL, writeString},
   {"urlnum", VAR_URLNUM, CURLINFO_NONE, writeLong},
   {NULL, VAR_NONE, CURLINFO_NONE, NULL}
@@ -175,49 +185,70 @@ static int writeTime(FILE *stream, const struct writeoutvar *wovar,
   return 1; /* return 1 if anything was written */
 }
 
-static int urlpart(char *url, writeoutid vid, const char **contentp)
+static int urlpart(struct per_transfer *per, writeoutid vid,
+                   const char **contentp)
 {
   CURLU *uh = curl_url();
   int rc = 0;
-  if(url) {
+  if(uh) {
     CURLUPart cpart = CURLUPART_HOST;
     char *part = NULL;
+    const char *url = NULL;
 
-    switch(vid) {
-    case VAR_INPUT_URLHOST:
-      cpart = CURLUPART_HOST;
-      break;
-    case VAR_INPUT_URLPATH:
-      cpart = CURLUPART_PATH;
-      break;
-    case VAR_INPUT_URLSCHEME:
-      cpart = CURLUPART_SCHEME;
-      break;
-    case VAR_INPUT_URLUSER:
-      cpart = CURLUPART_USER;
-      break;
-    case VAR_INPUT_URLPASSWORD:
-      cpart = CURLUPART_PASSWORD;
-      break;
-    case VAR_INPUT_URLOPTIONS:
-      cpart = CURLUPART_OPTIONS;
-      break;
-    case VAR_INPUT_URLPORT:
-      cpart = CURLUPART_PORT;
-      break;
-    case VAR_INPUT_URLQUERY:
-      cpart = CURLUPART_QUERY;
-      break;
-    case VAR_INPUT_URLFRAGMENT:
-      cpart = CURLUPART_FRAGMENT;
-      break;
-    case VAR_INPUT_URLZONEID:
-      cpart = CURLUPART_ZONEID;
-      break;
-    default:
-      /* not implemented */
-      rc = 4;
-      break;
+    if(vid >= VAR_INPUT_URLEHOST) {
+      if(curl_easy_getinfo(per->curl, CURLINFO_EFFECTIVE_URL, &url))
+        rc = 5;
+    }
+    else
+      url = per->this_url;
+
+    if(!rc) {
+      switch(vid) {
+      case VAR_INPUT_URLHOST:
+      case VAR_INPUT_URLEHOST:
+        cpart = CURLUPART_HOST;
+        break;
+      case VAR_INPUT_URLPATH:
+      case VAR_INPUT_URLEPATH:
+        cpart = CURLUPART_PATH;
+        break;
+      case VAR_INPUT_URLSCHEME:
+      case VAR_INPUT_URLESCHEME:
+        cpart = CURLUPART_SCHEME;
+        break;
+      case VAR_INPUT_URLUSER:
+      case VAR_INPUT_URLEUSER:
+        cpart = CURLUPART_USER;
+        break;
+      case VAR_INPUT_URLPASSWORD:
+      case VAR_INPUT_URLEPASSWORD:
+        cpart = CURLUPART_PASSWORD;
+        break;
+      case VAR_INPUT_URLOPTIONS:
+      case VAR_INPUT_URLEOPTIONS:
+        cpart = CURLUPART_OPTIONS;
+        break;
+      case VAR_INPUT_URLPORT:
+      case VAR_INPUT_URLEPORT:
+        cpart = CURLUPART_PORT;
+        break;
+      case VAR_INPUT_URLQUERY:
+      case VAR_INPUT_URLEQUERY:
+        cpart = CURLUPART_QUERY;
+        break;
+      case VAR_INPUT_URLFRAGMENT:
+      case VAR_INPUT_URLEFRAGMENT:
+        cpart = CURLUPART_FRAGMENT;
+        break;
+      case VAR_INPUT_URLZONEID:
+      case VAR_INPUT_URLEZONEID:
+        cpart = CURLUPART_ZONEID;
+        break;
+      default:
+        /* not implemented */
+        rc = 4;
+        break;
+      }
     }
     if(!rc && curl_url_set(uh, CURLUPART_URL, url,
                            CURLU_GUESS_SCHEME|CURLU_NON_SUPPORT_SCHEME))
@@ -343,8 +374,18 @@ static int writeString(FILE *stream, const struct writeoutvar *wovar,
     case VAR_INPUT_URLQUERY:
     case VAR_INPUT_URLFRAGMENT:
     case VAR_INPUT_URLZONEID:
+    case VAR_INPUT_URLEHOST:
+    case VAR_INPUT_URLEPATH:
+    case VAR_INPUT_URLESCHEME:
+    case VAR_INPUT_URLEUSER:
+    case VAR_INPUT_URLEPASSWORD:
+    case VAR_INPUT_URLEOPTIONS:
+    case VAR_INPUT_URLEPORT:
+    case VAR_INPUT_URLEQUERY:
+    case VAR_INPUT_URLEFRAGMENT:
+    case VAR_INPUT_URLEZONEID:
       if(per->this_url) {
-        if(!urlpart(per->this_url, wovar->id, &strinfo)) {
+        if(!urlpart(per, wovar->id, &strinfo)) {
           freestr = strinfo;
           valid = true;
         }
